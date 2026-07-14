@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slack token setup</title>
+<style>
+  :root{
+    color-scheme:light;
+    --bg:#f6f7f9; --card:#fff; --fg:#0e1726; --muted:#5b6675;
+    --border:#e2e6eb; --accent:#4a154b; --accent-fg:#fff;
+    --code-bg:#0e1726; --code-fg:#e8ecf3; --ok:#1a7f4b; --err:#b4232c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      color-scheme:dark;
+      --bg:#0f1420; --card:#161c2b; --fg:#e8ecf3; --muted:#9aa6b8;
+      --border:#28303f; --accent:#611f69; --accent-fg:#fff;
+      --code-bg:#0a0e17; --code-fg:#e8ecf3; --ok:#3ecf8e; --err:#ff6b74;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#0f1420; --card:#161c2b; --fg:#e8ecf3; --muted:#9aa6b8;
+    --border:#28303f; --accent:#611f69; --accent-fg:#fff;
+    --code-bg:#0a0e17; --code-fg:#e8ecf3; --ok:#3ecf8e; --err:#ff6b74;
+  }
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#f6f7f9; --card:#fff; --fg:#0e1726; --muted:#5b6675;
+    --border:#e2e6eb; --accent:#4a154b; --accent-fg:#fff;
+    --code-bg:#0e1726; --code-fg:#e8ecf3; --ok:#1a7f4b; --err:#b4232c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 16px;}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .sub{color:var(--muted);margin:0 0 24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:20px;margin-bottom:16px}
+  .step{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 10px}
+  .field{display:flex;gap:8px;align-items:stretch}
+  .box{flex:1;background:var(--code-bg);color:var(--code-fg);border:none;border-radius:8px;
+    padding:12px 14px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    white-space:pre-wrap;word-break:break-all;overflow-x:auto;resize:none;width:100%}
+  button.copy{border:none;border-radius:8px;background:var(--accent);color:var(--accent-fg);
+    font-weight:600;padding:0 16px;cursor:pointer;white-space:nowrap;font-size:13px}
+  button.copy:hover{filter:brightness(1.1)}
+  button.copy.done{background:var(--ok)}
+  .hint{color:var(--muted);font-size:13px;margin:10px 0 0}
+  code{background:var(--border);padding:1px 6px;border-radius:4px;font-size:.9em}
+  .err{color:var(--err);font-weight:600}
+  .empty{color:var(--muted)}
+  ol{margin:8px 0 0;padding-left:20px} ol li{margin:4px 0}
+  a{color:var(--accent)} :root[data-theme="dark"] a,@media (prefers-color-scheme:dark){a{color:#c98bd0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔑 Slack token setup</h1>
+  <p class="sub">Finish getting your personal Slack user token for the Claude MCP.</p>
+  <div id="content"></div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  const error = params.get("error");
+  const redirectUri = location.origin + location.pathname;
+  const content = document.getElementById("content");
+
+  function box(id, value){
+    return `<div class="field">
+      <textarea class="box" id="${id}" rows="${value.split("\n").length}" readonly>${value}</textarea>
+      <button class="copy" data-target="${id}">Copy</button>
+    </div>`;
+  }
+
+  if (error){
+    content.innerHTML = `<div class="card">
+      <p class="step">Authorization failed</p>
+      <p class="err">Slack returned: ${error}</p>
+      <p class="hint">Go back and click <b>Allow</b> on the Slack authorize screen. If it keeps failing, the app's redirect URL may not match this page.</p>
+    </div>`;
+  } else if (!code){
+    content.innerHTML = `<div class="card">
+      <p class="step">Waiting for a code</p>
+      <p class="empty">This page catches the <code>?code=…</code> that Slack sends back after you authorize the app. Open your team's authorize link, click <b>Allow</b>, and you'll land back here with your code ready to copy.</p>
+    </div>`;
+  } else {
+    const curl = `curl -s -F client_id=<CLIENT_ID> \\
+     -F client_secret=<CLIENT_SECRET> \\
+     -F code=${code} \\
+     -F redirect_uri=${redirectUri} \\
+     https://slack.com/api/oauth.v2.access | grep -o '"access_token":"xoxp-[^"]*"'`;
+    content.innerHTML = `
+      <div class="card">
+        <p class="step">Step 1 — your authorization code</p>
+        ${box("code", code)}
+        <p class="hint">Single-use, expires in ~10 minutes. Use it right away in step 2.</p>
+      </div>
+      <div class="card">
+        <p class="step">Step 2 — exchange it for your token</p>
+        <p class="hint" style="margin-top:0">Fill in <code>&lt;CLIENT_ID&gt;</code> and <code>&lt;CLIENT_SECRET&gt;</code> (ask whoever owns the app), then run this. The output line contains your <code>xoxp-…</code> token.</p>
+        ${box("curl", curl)}
+      </div>
+      <div class="card">
+        <p class="step">Step 3 — connect it to Claude</p>
+        <p class="hint" style="margin-top:0">Paste your <code>xoxp-…</code> token into this command and run it:</p>
+        ${box("mcp", `claude mcp add slack -s user \\
+  -e SLACK_MCP_XOXP_TOKEN=<YOUR-xoxp-TOKEN> \\
+  -e SLACK_MCP_ADD_MESSAGE_TOOL=true \\
+  -- npx -y slack-mcp-server@latest --transport stdio`)}
+        <p class="hint">Then restart Claude Code so it loads the Slack tools.</p>
+      </div>`;
+  }
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button.copy");
+    if (!btn) return;
+    const el = document.getElementById(btn.dataset.target);
+    try{
+      await navigator.clipboard.writeText(el.value);
+    }catch{
+      el.select(); document.execCommand("copy");
+    }
+    const label = btn.textContent;
+    btn.textContent = "Copied ✓"; btn.classList.add("done");
+    setTimeout(() => { btn.textContent = label; btn.classList.remove("done"); }, 1500);
+  });
+</script>
+</body>
+</html>
