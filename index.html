@@ -68,8 +68,6 @@
   const params = new URLSearchParams(location.search);
   const code = params.get("code");
   const error = params.get("error");
-  const redirectUri = location.origin + location.pathname;
-  const CLIENT_ID = "11171572449634.11582201726469";
   const content = document.getElementById("content");
 
   function box(id, value){
@@ -91,30 +89,11 @@
       <p class="empty">This page catches the <code>?code=…</code> that Slack sends back after you authorize the app. Open your team's authorize link, click <b>Allow</b>, and you'll land back here with your code ready to copy.</p>
     </div>`;
   } else {
-    const curl = `curl -s -F client_id=${CLIENT_ID} \\
-     -F client_secret=<CLIENT_SECRET> \\
-     -F code=${code} \\
-     -F redirect_uri=${redirectUri} \\
-     https://slack.com/api/oauth.v2.access | grep -o '"access_token":"xoxp-[^"]*"'`;
     content.innerHTML = `
       <div class="card">
-        <p class="step">Step 1 — your authorization code</p>
-        ${box("code", code)}
-        <p class="hint">Single-use, expires in ~10 minutes. Use it right away in step 2.</p>
-      </div>
-      <div class="card">
-        <p class="step">Step 2 — exchange it for your token</p>
-        <p class="hint" style="margin-top:0">The client ID is already filled in. Replace only <code>&lt;CLIENT_SECRET&gt;</code> with the client secret from your team's secret store (your onboarding message says where — ask Gilad if unsure), then run this. The output line contains your <code>xoxp-…</code> token.</p>
-        ${box("curl", curl)}
-      </div>
-      <div class="card">
-        <p class="step">Step 3 — connect it to Claude</p>
-        <p class="hint" style="margin-top:0">Paste your <code>xoxp-…</code> token into this command and run it:</p>
-        ${box("mcp", `claude mcp add slack -s user \\
-  -e SLACK_MCP_XOXP_TOKEN=<YOUR-xoxp-TOKEN> \\
-  -e SLACK_MCP_ADD_MESSAGE_TOOL=true \\
-  -- npx -y slack-mcp-server@latest --transport stdio`)}
-        <p class="hint">Then restart Claude Code so it loads the Slack tools.</p>
+        <p class="step">Run this to finish setup</p>
+        ${box("cmd", `./devops/slack_mcp_setup.sh ${code}`)}
+        <p class="hint">Run it from an up-to-date <code>trading</code> checkout (<code>git pull</code> first). It fetches your Slack token and installs the MCP — nothing to paste. Then restart Claude Code and you're done.</p>
       </div>`;
   }
 
